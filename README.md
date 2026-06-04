@@ -4,6 +4,17 @@ ProfileLens is an AI-powered Identity & Privacy Management Platform that enables
 
 ---
 
+## 🎯 The Core Problem ProfileLens Solves (Why this project exists)
+
+Traditional social media platforms only offer binary privacy settings (either your profile photo is visible to everyone, or it's hidden). There is no way to present different versions of your digital identity to different social circles.
+
+**ProfileLens solves this by engineering "Context-Aware Identity Controls":**
+* **The Core Concept:** A user can generate multiple AI-powered avatars (e.g., professional, casual, cartoon, anime) within the platform.
+* **Granular Audience Mapping:** Instead of hiding your profile, you map specific images to specific audience groups. 
+* **The Result:** When your **Close Friends** view your profile, they see a personalized, casual AI avatar. When **Normal Contacts** or professional circles view the exact same profile, they see a totally different, appropriate profile image—all simulated dynamically through automated privacy scopes.
+
+---
+
 ## 🚀 Core Features
 
 ### 🤖 AI Studio & Photo Management
