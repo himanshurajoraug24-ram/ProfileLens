@@ -1,0 +1,755 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: ProfileLens API — privacy-first multi-photo profile visibility
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: profile
+    description: User profile management
+  - name: photos
+    description: Profile photo management
+  - name: contacts
+    description: Contact management
+  - name: lists
+    description: Custom contact list management
+  - name: visibility
+    description: Photo visibility rules
+  - name: storage
+    description: Object storage upload and serving endpoints
+paths:
+  /storage/uploads/request-url:
+    post:
+      operationId: requestUploadUrl
+      tags: [storage]
+      summary: Request a presigned URL for file upload
+      description: |
+        Returns a presigned GCS URL for direct upload. Send JSON metadata only — NOT the file.
+        Then upload the file directly to the returned presigned URL via PUT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StorageUploadRequest"
+      responses:
+        "200":
+          description: Presigned upload URL generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageUploadResponse"
+        "400":
+          description: Missing or invalid fields
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+        "500":
+          description: Failed to generate URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /storage/objects/{objectPath}:
+    get:
+      operationId: getStorageObject
+      tags: [storage]
+      summary: Serve an uploaded object
+      parameters:
+        - name: objectPath
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Object content
+          content:
+            "*/*":
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /me:
+    get:
+      operationId: getMe
+      tags: [profile]
+      summary: Get current user profile
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    patch:
+      operationId: updateMe
+      tags: [profile]
+      summary: Update current user profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+
+  /me/stats:
+    get:
+      operationId: getMyStats
+      tags: [profile]
+      summary: Get dashboard summary stats
+      responses:
+        "200":
+          description: Stats overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+
+  /photos:
+    get:
+      operationId: listPhotos
+      tags: [photos]
+      summary: List all profile photos for current user
+      responses:
+        "200":
+          description: List of photos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ProfilePhoto"
+    post:
+      operationId: createPhoto
+      tags: [photos]
+      summary: Upload a new profile photo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhotoInput"
+      responses:
+        "201":
+          description: Created photo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfilePhoto"
+
+  /photos/{photoId}:
+    get:
+      operationId: getPhoto
+      tags: [photos]
+      summary: Get a specific profile photo
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Photo detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfilePhoto"
+    patch:
+      operationId: updatePhoto
+      tags: [photos]
+      summary: Update photo label or set as default
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PhotoUpdate"
+      responses:
+        "200":
+          description: Updated photo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfilePhoto"
+    delete:
+      operationId: deletePhoto
+      tags: [photos]
+      summary: Delete a profile photo
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /photos/{photoId}/visibility:
+    get:
+      operationId: getPhotoVisibility
+      tags: [visibility]
+      summary: Get visibility rule for a photo
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Visibility rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisibilityRule"
+    put:
+      operationId: setPhotoVisibility
+      tags: [visibility]
+      summary: Set visibility rule for a photo
+      parameters:
+        - name: photoId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VisibilityInput"
+      responses:
+        "200":
+          description: Updated visibility rule
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisibilityRule"
+
+  /preview/{contactId}:
+    get:
+      operationId: previewAsContact
+      tags: [visibility]
+      summary: Preview which photo a specific contact would see
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Photo the contact would see
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VisibilityPreview"
+
+  /contacts:
+    get:
+      operationId: listContacts
+      tags: [contacts]
+      summary: List all contacts
+      responses:
+        "200":
+          description: List of contacts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+    post:
+      operationId: createContact
+      tags: [contacts]
+      summary: Add a new contact
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactInput"
+      responses:
+        "201":
+          description: Created contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/{contactId}:
+    patch:
+      operationId: updateContact
+      tags: [contacts]
+      summary: Update a contact
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactUpdate"
+      responses:
+        "200":
+          description: Updated contact
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+    delete:
+      operationId: deleteContact
+      tags: [contacts]
+      summary: Remove a contact
+      parameters:
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /lists:
+    get:
+      operationId: listContactLists
+      tags: [lists]
+      summary: List all custom contact lists
+      responses:
+        "200":
+          description: List of contact lists
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ContactList"
+    post:
+      operationId: createContactList
+      tags: [lists]
+      summary: Create a custom contact list
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactListInput"
+      responses:
+        "201":
+          description: Created list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactList"
+
+  /lists/{listId}:
+    patch:
+      operationId: updateContactList
+      tags: [lists]
+      summary: Rename a contact list
+      parameters:
+        - name: listId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ContactListUpdate"
+      responses:
+        "200":
+          description: Updated list
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ContactList"
+    delete:
+      operationId: deleteContactList
+      tags: [lists]
+      summary: Delete a custom list
+      parameters:
+        - name: listId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+
+  /lists/{listId}/members:
+    get:
+      operationId: listContactListMembers
+      tags: [lists]
+      summary: Get members of a list
+      parameters:
+        - name: listId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List members
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Contact"
+    post:
+      operationId: addContactToList
+      tags: [lists]
+      summary: Add a contact to a list
+      parameters:
+        - name: listId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ListMemberInput"
+      responses:
+        "201":
+          description: Member added
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /lists/{listId}/members/{contactId}:
+    delete:
+      operationId: removeContactFromList
+      tags: [lists]
+      summary: Remove a contact from a list
+      parameters:
+        - name: listId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: contactId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Removed
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    User:
+      type: object
+      required: [id, name, username, createdAt]
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        username:
+          type: string
+        bio:
+          type: ["string", "null"]
+        defaultPhotoId:
+          type: ["integer", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        bio:
+          type: string
+
+    UserStats:
+      type: object
+      required: [totalPhotos, activeRules, totalContacts, totalLists, publicPhotoId]
+      properties:
+        totalPhotos:
+          type: integer
+        activeRules:
+          type: integer
+        totalContacts:
+          type: integer
+        totalLists:
+          type: integer
+        publicPhotoId:
+          type: ["integer", "null"]
+
+    ProfilePhoto:
+      type: object
+      required: [id, userId, label, imageUrl, isDefault, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        label:
+          type: string
+        imageUrl:
+          type: string
+        isDefault:
+          type: boolean
+        visibilityType:
+          type: ["string", "null"]
+        createdAt:
+          type: string
+          format: date-time
+
+    PhotoInput:
+      type: object
+      required: [label, imageUrl]
+      properties:
+        label:
+          type: string
+          minLength: 1
+        imageUrl:
+          type: string
+        isDefault:
+          type: boolean
+
+    PhotoUpdate:
+      type: object
+      properties:
+        label:
+          type: string
+          minLength: 1
+        isDefault:
+          type: boolean
+
+    VisibilityType:
+      type: string
+      enum: [public, contacts, selected, custom_list, nobody]
+
+    VisibilityRule:
+      type: object
+      required: [photoId, type]
+      properties:
+        photoId:
+          type: integer
+        type:
+          $ref: "#/components/schemas/VisibilityType"
+        selectedContactIds:
+          type: array
+          items:
+            type: integer
+        listId:
+          type: ["integer", "null"]
+        excludedContactIds:
+          type: array
+          items:
+            type: integer
+
+    VisibilityInput:
+      type: object
+      required: [type]
+      properties:
+        type:
+          $ref: "#/components/schemas/VisibilityType"
+        selectedContactIds:
+          type: array
+          items:
+            type: integer
+        listId:
+          type: ["integer", "null"]
+        excludedContactIds:
+          type: array
+          items:
+            type: integer
+
+    VisibilityPreview:
+      type: object
+      required: [contactId, photoId, reason]
+      properties:
+        contactId:
+          type: integer
+        photoId:
+          type: integer
+        reason:
+          type: string
+        photo:
+          $ref: "#/components/schemas/ProfilePhoto"
+
+    Contact:
+      type: object
+      required: [id, userId, name, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        handle:
+          type: ["string", "null"]
+        avatarUrl:
+          type: ["string", "null"]
+        listIds:
+          type: array
+          items:
+            type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    ContactInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        handle:
+          type: string
+        avatarUrl:
+          type: string
+
+    ContactUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+        handle:
+          type: string
+        avatarUrl:
+          type: string
+
+    ContactList:
+      type: object
+      required: [id, userId, name, memberCount, createdAt]
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        name:
+          type: string
+        memberCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    ContactListInput:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+
+    ContactListUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+
+    ListMemberInput:
+      type: object
+      required: [contactId]
+      properties:
+        contactId:
+          type: integer
+
+    StorageUploadRequest:
+      type: object
+      required: [name, size, contentType]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Original file name
+        size:
+          type: integer
+          minimum: 1
+          description: File size in bytes
+        contentType:
+          type: string
+          minLength: 1
+          description: MIME type (e.g. image/jpeg)
+
+    StorageUploadResponse:
+      type: object
+      required: [uploadURL, objectPath]
+      properties:
+        uploadURL:
+          type: string
+          description: Presigned GCS URL for PUT upload
+        objectPath:
+          type: string
+          description: Normalized object path (e.g. /objects/uploads/uuid)
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
